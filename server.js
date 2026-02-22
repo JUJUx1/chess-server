@@ -214,35 +214,25 @@ io.on('connection', (socket) => {
   });
 
   // ── WebRTC Voice Signaling ──
-  // Relay offer/answer/ice between the two players in a room
-
   socket.on('voice_call_request', ({ roomId }) => {
-    // Tell the other player someone wants to call
     socket.to(roomId).emit('voice_call_incoming', { from: socket.data.username });
   });
-
   socket.on('voice_call_accept', ({ roomId }) => {
     socket.to(roomId).emit('voice_call_accepted');
   });
-
   socket.on('voice_call_reject', ({ roomId }) => {
     socket.to(roomId).emit('voice_call_rejected');
   });
-
   socket.on('voice_call_end', ({ roomId }) => {
     socket.to(roomId).emit('voice_call_ended');
   });
+  socket.on('webrtc_offer',  ({ roomId, offer })     => socket.to(roomId).emit('webrtc_offer',  { offer }));
+  socket.on('webrtc_answer', ({ roomId, answer })    => socket.to(roomId).emit('webrtc_answer', { answer }));
+  socket.on('webrtc_ice',    ({ roomId, candidate }) => socket.to(roomId).emit('webrtc_ice',    { candidate }));
 
-  socket.on('webrtc_offer', ({ roomId, offer }) => {
-    socket.to(roomId).emit('webrtc_offer', { offer });
-  });
-
-  socket.on('webrtc_answer', ({ roomId, answer }) => {
-    socket.to(roomId).emit('webrtc_answer', { answer });
-  });
-
-  socket.on('webrtc_ice', ({ roomId, candidate }) => {
-    socket.to(roomId).emit('webrtc_ice', { candidate });
+  socket.on('voice_switch_relay', ({ roomId }) => socket.to(roomId).emit('voice_switch_relay'));
+  socket.on('audio_chunk', ({ roomId, chunk }) => {
+    socket.to(roomId).emit('audio_chunk', { chunk });
   });
 
   // ── Disconnect ──
