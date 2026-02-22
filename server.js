@@ -214,25 +214,49 @@ io.on('connection', (socket) => {
   });
 
   // ── WebRTC Voice Signaling ──
+  // Routes directly to opponent by username (works even after Render cold restart wipes room state)
+  function getOpponentSid(senderSocket, roomId) {
+    const room = rooms[roomId];
+    if (room) {
+      const oppName = room.white === senderSocket.data.username ? room.black : room.white;
+      const sid = users[oppName];
+      if (sid) return sid;
+    }
+    // Fallback: scan Socket.IO room membership
+    const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
+    if (socketsInRoom) {
+      for (const sid of socketsInRoom) {
+        if (sid !== senderSocket.id) return sid;
+      }
+    }
+    return null;
+  }
+
+  function emitToOpponent(senderSocket, roomId, event, data) {
+    const sid = getOpponentSid(senderSocket, roomId);
+    if (sid) io.to(sid).emit(event, data);
+    else console.warn('emitToOpponent: no opponent found for room', roomId);
+  }
+
   socket.on('voice_call_request', ({ roomId }) => {
-    socket.to(roomId).emit('voice_call_incoming', { from: socket.data.username });
+    emitToOpponent(socket, roomId, 'voice_call_incoming', { from: socket.data.username });
   });
   socket.on('voice_call_accept', ({ roomId }) => {
-    socket.to(roomId).emit('voice_call_accepted');
+    emitToOpponent(socket, roomId, 'voice_call_accepted', {});
   });
   socket.on('voice_call_reject', ({ roomId }) => {
-    socket.to(roomId).emit('voice_call_rejected');
+    emitToOpponent(socket, roomId, 'voice_call_rejected', {});
   });
   socket.on('voice_call_end', ({ roomId }) => {
-    socket.to(roomId).emit('voice_call_ended');
+    emitToOpponent(socket, roomId, 'voice_call_ended', {});
   });
-  socket.on('webrtc_offer',  ({ roomId, offer })     => socket.to(roomId).emit('webrtc_offer',  { offer }));
-  socket.on('webrtc_answer', ({ roomId, answer })    => socket.to(roomId).emit('webrtc_answer', { answer }));
-  socket.on('webrtc_ice',    ({ roomId, candidate }) => socket.to(roomId).emit('webrtc_ice',    { candidate }));
+  socket.on('webrtc_offer',  ({ roomId, offer })     => emitToOpponent(socket, roomId, 'webrtc_offer',  { offer }));
+  socket.on('webrtc_answer', ({ roomId, answer })    => emitToOpponent(socket, roomId, 'webrtc_answer', { answer }));
+  socket.on('webrtc_ice',    ({ roomId, candidate }) => emitToOpponent(socket, roomId, 'webrtc_ice',    { candidate }));
 
-  socket.on('voice_switch_relay', ({ roomId }) => socket.to(roomId).emit('voice_switch_relay'));
+  socket.on('voice_switch_relay', ({ roomId }) => emitToOpponent(socket, roomId, 'voice_switch_relay', {}));
   socket.on('audio_chunk', ({ roomId, chunk }) => {
-    socket.to(roomId).emit('audio_chunk', { chunk });
+    emitToOpponent(socket, roomId, 'audio_chunk', { chunk });
   });
 
   // ── Disconnect ──
